@@ -27,8 +27,8 @@ export interface Product {
   is_available: boolean;
   condition_type: 'new' | 'like_new' | 'refurbished';
   condition?: string;
-  height_cm?: string | number;
-  width_cm?: string | number;
+  height_cm?: number;
+  width_cm?: number;
   created_at: string;
   variants?: ProductVariant[];
   thumbnail?: string;
