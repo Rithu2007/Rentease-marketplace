@@ -1,0 +1,276 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 24% 5%;       /* #0A0A0F */
+    --surface: 240 17% 8%;          /* #111118 */
+    --accent: 40 60% 58%;           /* #D4A853 - Rich Gold */
+    --secondary: 168 100% 42%;      /* #00D4AA - Electric Teal */
+    --border: 240 10% 12%;          /* #191924 */
+    --foreground: 0 0% 90%;         /* #E5E5E5 */
+    --border-card: rgba(255, 255, 255, 0.06);
+  }
+
+  html.light {
+    --background: 36 20% 95%;       /* #F8F5F0 */
+    --surface: 0 0% 100%;           /* #FFFFFF */
+    --accent: 40 88% 36%;           /* #B8860B - Darker Gold */
+    --secondary: 168 100% 30%;      /* #00876D - Darker Teal */
+    --border: 240 10% 85%;          /* #D8D8E0 */
+    --foreground: 240 30% 15%;      /* #1A1A2E */
+    --border-card: rgba(26, 26, 46, 0.08);
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'DM Sans', sans-serif;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+/* Custom Scrollbar (Thin 4px Gold) */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--accent));
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--accent) / 0.8);
+}
+
+
+
+/* 3D Playing Card Flip */
+.perspective-1000 {
+  perspective: 1000px;
+}
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Button Ripple Effect */
+.ripple-button {
+  position: relative;
+  overflow: hidden;
+}
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  animation: ripple-animation 0.6s cubic-bezier(0.1, 0.8, 0.3, 1);
+  background: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+@keyframes ripple-animation {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* Glassmorphism card utilities */
+.glass-card {
+  background: rgba(17, 17, 24, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card-hover:hover {
+  transform: translateY(-4px);
+  border-color: rgba(212, 168, 83, 0.25);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7),
+              0 1px 1px 0 rgba(212, 168, 83, 0.1) inset;
+}
+
+/* Gold Gradient text */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #FFF 0%, #D4A853 50%, #A37B30 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Teal Gradient text */
+.text-teal-gradient {
+  background: linear-gradient(135deg, #FFF 0%, #00D4AA 50%, #00A383 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Shimmer animation for Skeleton Loader */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #111118 25%, #1d1d29 50%, #111118 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Smooth zoom transition */
+.zoom-img {
+  transition: transform 0.3s ease-in-out;
+}
+
+.zoom-container:hover .zoom-img {
+  transform: scale(1.08);
+}
+
+/* Horizontal Marquee Ticker Strip */
+@keyframes marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 20s linear infinite;
+}
+
+/* --- LIGHT MODE TEXT & CARD CONTRAST OVERRIDES --- */
+
+/* 1. Headings */
+html.light h1,
+html.light h2,
+html.light h3,
+html.light h4,
+html.light h5,
+html.light h6 {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* 2. Paragraphs & standard gray text utilities (excluding dark containers like footer/buttons) */
+html.light p:not(footer *):not(button *):not(.bg-tealAccent *):not(.bg-goldAccent *):not(.bg-black *):not(.toast *),
+html.light .text-gray-400:not(footer *):not(button *):not(.bg-tealAccent *):not(.bg-goldAccent *):not(.bg-black *):not(.toast *),
+html.light .text-gray-300:not(footer *):not(button *):not(.bg-tealAccent *):not(.bg-goldAccent *):not(.bg-black *):not(.toast *),
+html.light .text-gray-200:not(footer *):not(button *):not(.bg-tealAccent *):not(.bg-goldAccent *):not(.bg-black *):not(.toast *),
+html.light .text-gray-100:not(footer *):not(button *):not(.bg-tealAccent *):not(.bg-goldAccent *):not(.bg-black *):not(.toast *) {
+  color: #434358 !important; /* Richer, darker grey for perfect contrast */
+}
+
+html.light .text-gray-500:not(footer *):not(button *):not(.bg-tealAccent *):not(.bg-goldAccent *):not(.bg-black *):not(.toast *) {
+  color: #55556B !important;
+}
+
+html.light .text-gray-600:not(footer *):not(button *):not(.bg-tealAccent *):not(.bg-goldAccent *):not(.bg-black *):not(.toast *) {
+  color: #3B3B4F !important;
+}
+
+/* 3. White text override - convert to dark text on light surfaces */
+html.light .text-white:not(footer *):not(button *):not(.bg-tealAccent *):not(.bg-goldAccent *):not(.bg-black *):not(.toast *):not([class*="bg-red"] *):not([class*="bg-green"] *) {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* 4. Inputs, selects, textareas and placeholder contrast */
+html.light input:not([type="checkbox"]):not([type="radio"]):not(button *),
+html.light select,
+html.light textarea {
+  color: hsl(var(--foreground)) !important;
+}
+
+html.light input::placeholder,
+html.light select::placeholder,
+html.light textarea::placeholder {
+  color: #77778C !important;
+}
+
+/* 5. Translucent background & border conversions (make dark panels light grey) */
+html.light [class*="bg-black/"] {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light [class*="bg-white/"] {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light [class*="border-white/"] {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 6. Glassmorphism card light theme override */
+html.light .glass-card {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border-color: rgba(26, 26, 46, 0.08) !important;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04) !important;
+}
+
+/* 7. Ensure outline buttons on landing page have proper contrast in light mode */
+html.light button.bg-transparent,
+html.light a.bg-transparent {
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--accent) / 0.5) !important;
+}
+
+html.light button.bg-transparent:hover,
+html.light a.bg-transparent:hover {
+  color: hsl(var(--accent)) !important;
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+/* 8. Ensure footer text remains visible on its dark background in light mode */
+html.light footer {
+  background-color: #06060A !important;
+}
+
+html.light footer h1,
+html.light footer h2,
+html.light footer h3,
+html.light footer h4,
+html.light footer h5,
+html.light footer h6,
+html.light footer .text-white {
+  color: #ffffff !important;
+}
+
+html.light footer p,
+html.light footer .text-gray-400 {
+  color: #9ca3af !important;
+}
+
+html.light footer a,
+html.light footer .text-gray-500 {
+  color: #6b7280 !important;
+}
+
+html.light footer a:hover {
+  color: #D4A853 !important;
+}
+
