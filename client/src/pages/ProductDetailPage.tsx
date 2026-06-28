@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Heart, ShoppingCart, Calendar, Truck, Clock, RefreshCw, Send, Star, Shield, ArrowLeft, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/axios';
 import { Product, ProductVariant, Review } from '../types';
 import { useMode } from '../context/ModeContext';

@@ -127,7 +127,7 @@ const CompareRadarChart: React.FC<{ products: any[]; mode: 'rent' | 'buy' }> = (
             const x = cx + labelDist * Math.cos(angle);
             const y = cy + labelDist * Math.sin(angle);
             
-            let textAnchor = 'middle';
+            let textAnchor: 'inherit' | 'middle' | 'end' | 'start' = 'middle';
             if (Math.cos(angle) > 0.1) textAnchor = 'start';
             else if (Math.cos(angle) < -0.1) textAnchor = 'end';
 

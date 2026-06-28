@@ -20,6 +20,7 @@ export default function AuthCallbackPage() {
   }, [checkSession]);
 
   useEffect(() => {
+    let timer: number | undefined;
     if (!isLoading) {
       if (user) {
         if (user.is_new_user) {
@@ -29,10 +30,12 @@ export default function AuthCallbackPage() {
         }
       } else {
         setError(true);
-        const timer = setTimeout(() => navigate('/login?error=oauth_failed'), 2000);
-        return () => clearTimeout(timer);
+        timer = setTimeout(() => navigate('/login?error=oauth_failed'), 2000);
       }
     }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [user, isLoading, navigate]);
 
   if (error) {
