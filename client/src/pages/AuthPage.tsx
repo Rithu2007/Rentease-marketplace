@@ -88,7 +88,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
       await login(data.email, data.password);
       navigate('/products');
     } catch (err: any) {
-      setServerError(err.response?.data?.message || 'Login failed. Incorrect credentials.');
+      setServerError(err.message || 'Login failed. Incorrect credentials.');
     }
   };
 
@@ -98,7 +98,7 @@ export default function AuthPage({ mode }: AuthPageProps) {
       await register(data.name, data.email, data.password, data.phone);
       navigate('/onboarding'); // Redirect successful registrations to onboarding stepper
     } catch (err: any) {
-      setServerError(err.response?.data?.message || 'Registration failed.');
+      setServerError(err.message || 'Registration failed.');
     }
   };
 

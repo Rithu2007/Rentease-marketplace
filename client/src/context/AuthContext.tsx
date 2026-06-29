@@ -16,8 +16,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// In-memory/localStorage seed database for fallback
-const DEFAULT_USERS = [
+// Default seeded users for demonstration
+const DEFAULT_USERS: any[] = [
   {
     id: 1,
     name: 'Ritish Admin',
@@ -44,10 +44,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Initialize users in localStorage if not already present
+  // Initialize users database in localStorage if not already present or invalid
   useEffect(() => {
     const storedUsers = localStorage.getItem('rentease_users');
-    if (!storedUsers) {
+    let valid = false;
+    if (storedUsers) {
+      try {
+        const parsed = JSON.parse(storedUsers);
+        if (Array.isArray(parsed)) {
+          valid = true;
+        }
+      } catch (e) {
+        valid = false;
+      }
+    }
+    if (!valid) {
       localStorage.setItem('rentease_users', JSON.stringify(DEFAULT_USERS));
     }
 
@@ -66,22 +77,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const checkSession = async () => {
     const activeUser = localStorage.getItem('rentease_current_user');
     if (activeUser) {
-      setUser(JSON.parse(activeUser));
+      try {
+        setUser(JSON.parse(activeUser));
+      } catch (e) {
+        setUser(null);
+      }
     } else {
       setUser(null);
     }
   };
 
   const login = async (email: string, password: string): Promise<User> => {
-    // Simulate delay
+    // Simulate minor delay for UX skeletons/loading state
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const storedUsers = localStorage.getItem('rentease_users');
-    const usersList = storedUsers ? JSON.parse(storedUsers) : DEFAULT_USERS;
+    let usersList = DEFAULT_USERS;
+    if (storedUsers) {
+      try {
+        const parsed = JSON.parse(storedUsers);
+        if (Array.isArray(parsed)) {
+          usersList = parsed;
+        }
+      } catch (e) {
+        usersList = DEFAULT_USERS;
+      }
+    }
 
-    const foundUser = usersList.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+    const cleanEmail = email.trim().toLowerCase();
+    const foundUser = usersList.find((u: any) => u.email.trim().toLowerCase() === cleanEmail);
     if (!foundUser) {
-      throw new Error('User not found.');
+      throw new Error('Incorrect credentials.');
     }
 
     if (foundUser.password !== password) {
@@ -97,21 +123,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const register = async (name: string, email: string, password: string, phone: string): Promise<User> => {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const storedUsers = localStorage.getItem('rentease_users') || JSON.stringify(DEFAULT_USERS);
-    const usersList = JSON.parse(storedUsers);
+    const storedUsers = localStorage.getItem('rentease_users');
+    let usersList = DEFAULT_USERS;
+    if (storedUsers) {
+      try {
+        const parsed = JSON.parse(storedUsers);
+        if (Array.isArray(parsed)) {
+          usersList = parsed;
+        }
+      } catch (e) {
+        usersList = DEFAULT_USERS;
+      }
+    }
 
-    const emailExists = usersList.some((u: any) => u.email.toLowerCase() === email.toLowerCase());
+    const cleanEmail = email.trim().toLowerCase();
+    const emailExists = usersList.some((u: any) => u.email.trim().toLowerCase() === cleanEmail);
     if (emailExists) {
       throw new Error('User with this email already exists.');
     }
 
     const newUser = {
       id: Math.max(...usersList.map((u: any) => u.id), 0) + 1,
-      name,
-      email,
-      password,
-      phone,
-      profile_picture: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
+      name: name.trim(),
+      email: email.trim(),
+      password: password,
+      phone: phone.trim(),
+      profile_picture: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name.trim())}`,
       is_new_user: true,
       created_at: new Date().toISOString()
     };
@@ -126,18 +163,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const mockGoogleLogin = async (name: string, email: string, picture?: string): Promise<User> => {
-    const storedUsers = localStorage.getItem('rentease_users') || JSON.stringify(DEFAULT_USERS);
-    const usersList = JSON.parse(storedUsers);
+    const storedUsers = localStorage.getItem('rentease_users');
+    let usersList = DEFAULT_USERS;
+    if (storedUsers) {
+      try {
+        const parsed = JSON.parse(storedUsers);
+        if (Array.isArray(parsed)) {
+          usersList = parsed;
+        }
+      } catch (e) {
+        usersList = DEFAULT_USERS;
+      }
+    }
 
-    let foundUser = usersList.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+    const cleanEmail = email.trim().toLowerCase();
+    let foundUser = usersList.find((u: any) => u.email.trim().toLowerCase() === cleanEmail);
     if (!foundUser) {
       foundUser = {
         id: Math.max(...usersList.map((u: any) => u.id), 0) + 1,
-        name,
-        email,
+        name: name.trim(),
+        email: email.trim(),
         password: 'GoogleSimulatedPassword@123',
-        phone: null,
-        profile_picture: picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name)}`,
+        phone: '',
+        profile_picture: picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name.trim())}`,
         is_new_user: true,
         created_at: new Date().toISOString()
       };
@@ -167,8 +215,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const storedUsers = localStorage.getItem('rentease_users') || JSON.stringify(DEFAULT_USERS);
-    const usersList = JSON.parse(storedUsers);
+    const storedUsers = localStorage.getItem('rentease_users');
+    let usersList = DEFAULT_USERS;
+    if (storedUsers) {
+      try {
+        const parsed = JSON.parse(storedUsers);
+        if (Array.isArray(parsed)) {
+          usersList = parsed;
+        }
+      } catch (e) {
+        usersList = DEFAULT_USERS;
+      }
+    }
 
     const userIndex = usersList.findIndex((u: any) => u.id === user.id);
     if (userIndex !== -1) {
@@ -187,13 +245,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const storedUsers = localStorage.getItem('rentease_users') || JSON.stringify(DEFAULT_USERS);
-    const usersList = JSON.parse(storedUsers);
+    const storedUsers = localStorage.getItem('rentease_users');
+    let usersList = DEFAULT_USERS;
+    if (storedUsers) {
+      try {
+        const parsed = JSON.parse(storedUsers);
+        if (Array.isArray(parsed)) {
+          usersList = parsed;
+        }
+      } catch (e) {
+        usersList = DEFAULT_USERS;
+      }
+    }
 
     const userIndex = usersList.findIndex((u: any) => u.id === user.id);
     if (userIndex !== -1) {
-      usersList[userIndex].name = name;
-      usersList[userIndex].phone = phone;
+      usersList[userIndex].name = name.trim();
+      usersList[userIndex].phone = phone ? phone.trim() : '';
       if (profilePicture) {
         usersList[userIndex].profile_picture = profilePicture;
       }
@@ -202,8 +270,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const updatedUser = { 
       ...user, 
-      name, 
-      phone, 
+      name: name.trim(), 
+      phone: phone ? phone.trim() : '', 
       profile_picture: profilePicture || user.profile_picture 
     };
     localStorage.setItem('rentease_current_user', JSON.stringify(updatedUser));
@@ -216,8 +284,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const storedUsers = localStorage.getItem('rentease_users') || JSON.stringify(DEFAULT_USERS);
-    const usersList = JSON.parse(storedUsers);
+    const storedUsers = localStorage.getItem('rentease_users');
+    let usersList = DEFAULT_USERS;
+    if (storedUsers) {
+      try {
+        const parsed = JSON.parse(storedUsers);
+        if (Array.isArray(parsed)) {
+          usersList = parsed;
+        }
+      } catch (e) {
+        usersList = DEFAULT_USERS;
+      }
+    }
 
     const userIndex = usersList.findIndex((u: any) => u.id === user.id);
     if (userIndex === -1) {
