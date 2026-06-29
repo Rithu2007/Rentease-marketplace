@@ -6,7 +6,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useMode } from '../context/ModeContext';
 import { useTheme, themes as colorThemes } from '../context/ThemeContext';
-import api from '../api/axios';
+import { products } from '../data/products';
 
 interface SearchSuggestion {
   id: number;
@@ -73,8 +73,21 @@ export const Navbar: React.FC = () => {
 
     const delayDebounce = setTimeout(async () => {
       try {
-        const response = await api.get(`/products/search?q=${encodeURIComponent(searchQuery)}`);
-        setSuggestions(response.data);
+        const term = searchQuery.toLowerCase().trim();
+        const matched = products.filter(p => 
+          p.name.toLowerCase().includes(term) ||
+          p.brand.toLowerCase().includes(term) ||
+          p.category.toLowerCase().includes(term)
+        ).slice(0, 5).map(p => ({
+          id: p.id,
+          name: p.name,
+          brand: p.brand,
+          category: p.category,
+          buy_price: p.buy_price,
+          rent_price_month: p.rent_price_month,
+          thumbnail: p.variants?.[0]?.images?.[0] || p.thumbnail || ''
+        }));
+        setSuggestions(matched);
       } catch (err) {
         console.error('Search suggestion failure:', err);
       }

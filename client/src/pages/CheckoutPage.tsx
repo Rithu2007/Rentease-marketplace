@@ -2,11 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Calendar, CreditCard, Plus, Check, ArrowLeft, ArrowRight, ShieldCheck, X } from 'lucide-react';
-import api from '../api/axios';
 import { Address, CartItem } from '../types';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+
+const DEFAULT_ADDRESSES = [
+  {
+    id: 1,
+    user_id: 2,
+    label: 'Home',
+    full_name: 'John Doe',
+    phone: '9999988888',
+    flat: 'Flat 304, Block B',
+    street: '12th Main Road',
+    area: 'Indiranagar',
+    city: 'Bangalore',
+    state: 'Karnataka',
+    pincode: '560038',
+    landmark: 'Opposite Metro Station',
+    is_default: true
+  }
+];
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -55,8 +72,14 @@ export default function CheckoutPage() {
   const { data: addresses = [], isLoading: addressesLoading } = useQuery<Address[]>({
     queryKey: ['addresses', user?.id],
     queryFn: async () => {
-      const response = await api.get('/users/addresses');
-      return response.data;
+      const key = `rentease_addresses_${user?.id || 'guest'}`;
+      let list = localStorage.getItem(key);
+      if (!list) {
+        const seeded = DEFAULT_ADDRESSES.map(a => ({ ...a, user_id: user?.id || 2 }));
+        localStorage.setItem(key, JSON.stringify(seeded));
+        return seeded;
+      }
+      return JSON.parse(list);
     },
     enabled: !!user
   });
@@ -72,8 +95,33 @@ export default function CheckoutPage() {
   // Address Insertion Mutation
   const addressMutation = useMutation({
     mutationFn: async (payload: any) => {
-      const response = await api.post('/users/addresses', payload);
-      return response.data;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const key = `rentease_addresses_${user?.id || 'guest'}`;
+      const current = JSON.parse(localStorage.getItem(key) || '[]');
+      
+      const newAddr: Address = {
+        id: Math.max(...current.map((a: any) => a.id), 0) + 1,
+        user_id: user?.id || 1,
+        label: payload.label || 'Home',
+        full_name: payload.fullName,
+        phone: payload.phone,
+        flat: payload.flat,
+        street: payload.street,
+        area: payload.area,
+        city: payload.city,
+        state: payload.state,
+        pincode: payload.pincode,
+        landmark: payload.landmark || null,
+        is_default: payload.isDefault || false
+      };
+
+      if (newAddr.is_default) {
+        current.forEach((a: any) => a.is_default = false);
+      }
+
+      current.push(newAddr);
+      localStorage.setItem(key, JSON.stringify(current));
+      return { address: newAddr };
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['addresses', user?.id] });
@@ -127,85 +175,9 @@ export default function CheckoutPage() {
       return;
     }
 
-    try {
-      // 1. Create order on backend
-      const orderRes = await api.post('/payment/create-order', { amount: finalTotal });
-      const { order_id, amount, currency, key_id, isMock } = orderRes.data;
-
-      // 2. Direct to Google OAuth / Razorpay mock simulation if keys are mock
-      if (isMock) {
-        setMockRazorpayOrderId(order_id);
-        setShowMockPaymentGateway(true);
-        return;
-      }
-
-      // 3. Launch Real Razorpay checkout modal
-      const isScriptLoaded = await loadRazorpayScript();
-      if (!isScriptLoaded) {
-        showToast('Failed to load Razorpay payment SDK. Check your network.', 'error');
-        return;
-      }
-
-      const options = {
-        key: key_id,
-        amount,
-        currency,
-        name: 'RentEase India',
-        description: 'Furniture & Appliance Checkout',
-        order_id,
-        prefill: {
-          name: user?.name || '',
-          email: user?.email || '',
-          phone: user?.phone || ''
-        },
-        theme: {
-          color: '#D4A853' // Luxury Gold
-        },
-        handler: async function (response: any) {
-          // Real payment verification callback
-          try {
-            const verifyRes = await api.post('/payment/verify', {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
-            });
-
-            if (verifyRes.data.success) {
-              // Create backend order details
-              const saveOrderRes = await api.post('/orders/create', {
-                addressId: selectedAddressId,
-                razorpayOrderId: response.razorpay_order_id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                subtotal: totals.subtotal,
-                gst: totals.gst,
-                deliveryCharge: totals.deliveryCharge,
-                total: finalTotal,
-                mode: hasRentals ? 'rent' : 'buy',
-                deliveryDate
-              });
-
-              // Clear cart states
-              await clearCart();
-              // Remove coupon details
-              sessionStorage.removeItem('rentease_applied_promo');
-              sessionStorage.removeItem('rentease_applied_discount');
-
-              // Redirect
-              navigate(`/success?orderId=${saveOrderRes.data.orderId}`);
-            }
-          } catch (e: any) {
-            showToast('Signature verification failed: ' + (e.response?.data?.message || e.message), 'error');
-          }
-        }
-      };
-
-      const rzpay = new (window as any).Razorpay(options);
-      rzpay.open();
-
-    } catch (error: any) {
-      console.error(error);
-      showToast('Failed to initialize payment.', 'error');
-    }
+    const mockOrderId = `order_mock_${Math.random().toString(36).substring(2, 12)}`;
+    setMockRazorpayOrderId(mockOrderId);
+    setShowMockPaymentGateway(true);
   };
 
   // Mock Payment verification and order creation
@@ -216,37 +188,108 @@ export default function CheckoutPage() {
     setTimeout(async () => {
       try {
         const mockPaymentId = `pay_mock_${Math.random().toString(36).substring(2, 12)}`;
+        const orderId = Math.floor(1000 + Math.random() * 9000);
         
-        // Mock verification verify payload
-        const verifyRes = await api.post('/payment/verify', {
+        const key = `rentease_addresses_${user?.id || 'guest'}`;
+        const addressList = JSON.parse(localStorage.getItem(key) || '[]');
+        const addr = addressList.find((a: any) => a.id === selectedAddressId) || DEFAULT_ADDRESSES[0];
+
+        const newOrder = {
+          id: orderId,
+          user_id: user?.id || 2,
+          address_id: selectedAddressId,
           razorpay_order_id: mockRazorpayOrderId,
           razorpay_payment_id: mockPaymentId,
-          razorpay_signature: 'mock_bypass_payment_success'
+          payment_status: 'paid',
+          order_status: 'ordered',
+          subtotal: totals.subtotal.toFixed(2),
+          gst: totals.gst.toFixed(2),
+          delivery_charge: totals.deliveryCharge.toFixed(2),
+          total: finalTotal.toFixed(2),
+          mode: hasRentals ? 'rent' : 'buy',
+          created_at: new Date().toISOString()
+        };
+
+        const orderItems = cartItems.map(item => {
+          return {
+            id: Math.floor(100000 + Math.random() * 900000),
+            order_id: orderId,
+            product_id: item.product_id,
+            variant_id: item.variant_id,
+            quantity: item.quantity,
+            unit_price: item.mode === 'rent' ? item.rent_price_month : item.buy_price,
+            rental_duration: item.rental_duration,
+            rental_start_date: item.mode === 'rent' ? deliveryDate : null,
+            rental_end_date: item.mode === 'rent' 
+              ? new Date(new Date(deliveryDate).setMonth(new Date(deliveryDate).getMonth() + (item.rental_duration === '3_months' ? 3 : item.rental_duration === '6_months' ? 6 : 12))).toISOString().split('T')[0]
+              : null,
+            name: item.name,
+            brand: item.brand,
+            colour_name: item.colour_name,
+            thumbnail: Array.isArray(item.images) ? item.images[0] : item.images
+          };
         });
 
-        if (verifyRes.data.success) {
-          const saveOrderRes = await api.post('/orders/create', {
-            addressId: selectedAddressId,
-            razorpayOrderId: mockRazorpayOrderId,
-            razorpayPaymentId: mockPaymentId,
-            subtotal: totals.subtotal,
-            gst: totals.gst,
-            deliveryCharge: totals.deliveryCharge,
-            total: finalTotal,
-            mode: hasRentals ? 'rent' : 'buy',
-            deliveryDate
-          });
+        const orderDetail = {
+          ...newOrder,
+          shipping_name: addr.full_name,
+          shipping_phone: addr.phone,
+          flat: addr.flat,
+          street: addr.street,
+          area: addr.area,
+          city: addr.city,
+          state: addr.state,
+          pincode: addr.pincode,
+          landmark: addr.landmark,
+          items: orderItems
+        };
 
-          setMockPaymentStatus('success');
-          
-          setTimeout(async () => {
-            await clearCart();
-            sessionStorage.removeItem('rentease_applied_promo');
-            sessionStorage.removeItem('rentease_applied_discount');
-            setShowMockPaymentGateway(false);
-            navigate(`/success?orderId=${saveOrderRes.data.orderId}`);
-          }, 1000);
+        // Write detailed order info
+        localStorage.setItem(`rentease_order_details_${orderId}`, JSON.stringify(orderDetail));
+
+        // Append order to orders list
+        const existingOrders = JSON.parse(localStorage.getItem(`rentease_orders_${user?.id || 'guest'}`) || '[]');
+        existingOrders.unshift(newOrder);
+        localStorage.setItem(`rentease_orders_${user?.id || 'guest'}`, JSON.stringify(existingOrders));
+
+        // If there are rented items, append to active rentals list
+        if (hasRentals) {
+          const activeRentals = JSON.parse(localStorage.getItem(`rentease_active_rentals_${user?.id || 'guest'}`) || '[]');
+          orderItems.forEach(item => {
+            if (item.rental_duration) {
+              const start = new Date(item.rental_start_date!);
+              const end = new Date(item.rental_end_date!);
+              const diffTime = Math.abs(end.getTime() - start.getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              
+              activeRentals.unshift({
+                id: item.id,
+                rental_duration: item.rental_duration,
+                rental_start_date: item.rental_start_date!,
+                rental_end_date: item.rental_end_date!,
+                quantity: item.quantity,
+                product_id: item.product_id,
+                name: item.name,
+                brand: item.brand,
+                category: item.name.includes('Sofa') ? 'Sofa' : item.name.includes('Bed') ? 'Bed' : 'Appliance',
+                colour_name: item.colour_name,
+                thumbnail: item.thumbnail,
+                days_remaining: diffDays
+              });
+            }
+          });
+          localStorage.setItem(`rentease_active_rentals_${user?.id || 'guest'}`, JSON.stringify(activeRentals));
         }
+
+        setMockPaymentStatus('success');
+        
+        setTimeout(async () => {
+          await clearCart();
+          sessionStorage.removeItem('rentease_applied_promo');
+          sessionStorage.removeItem('rentease_applied_discount');
+          setShowMockPaymentGateway(false);
+          navigate(`/success?orderId=${orderId}`);
+        }, 1000);
       } catch (err) {
         showToast('Failed to place order in mock checkout mode.', 'error');
         setMockPaymentStatus('idle');

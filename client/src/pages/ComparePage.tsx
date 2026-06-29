@@ -2,7 +2,7 @@ import React from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Trash2, ShoppingCart, ArrowLeft, Layers, Heart } from 'lucide-react';
-import api from '../api/axios';
+import { products } from '../data/products';
 import { Product } from '../types';
 import { useMode } from '../context/ModeContext';
 import { useCart } from '../context/CartContext';
@@ -197,8 +197,15 @@ export default function ComparePage() {
     queryKey: ['compare', ids],
     queryFn: async () => {
       if (!ids) return [];
-      const response = await api.get(`/products/compare?ids=${ids}`);
-      return response.data;
+      const idList = ids.split(',').map(id => parseInt(id)).filter(id => !isNaN(id));
+      const filtered = products.filter(p => idList.includes(p.id)).map(p => {
+        return {
+          ...p,
+          variant_id: p.variants?.[0]?.id || p.id,
+          images: p.variants?.[0]?.images || []
+        };
+      });
+      return filtered;
     },
     enabled: !!ids
   });

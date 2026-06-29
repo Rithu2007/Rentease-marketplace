@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Filter, SlidersHorizontal, Heart, ShoppingCart, RefreshCw, Layers, Bell, Check, X } from 'lucide-react';
-import api from '../api/axios';
+import { products } from '../data/products';
 import { Product, ProductVariant } from '../types';
 import { useMode } from '../context/ModeContext';
 import { useCart } from '../context/CartContext';
@@ -415,24 +415,84 @@ export default function ProductsPage() {
       offset
     ],
     queryFn: async () => {
-      // Build filters payload
-      const params: Record<string, any> = {
-        mode,
-        limit,
-        offset,
-        sortBy,
-        isAvailable: isAvailableOnly ? 'true' : 'false'
+      // Introduce a simulated delay for loading skeleton feel
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      let result = [...products];
+
+      // 1. Filter by category
+      if (selectedCategories.length > 0) {
+        result = result.filter(p => selectedCategories.includes(p.category));
+      }
+
+      // 2. Filter by price range
+      const minPriceVal = priceRange[0];
+      const maxPriceVal = priceRange[1];
+      result = result.filter(p => {
+        const price = mode === 'rent' ? parseFloat(p.rent_price_month) : parseFloat(p.buy_price);
+        return price >= minPriceVal && price <= maxPriceVal;
+      });
+
+      // 3. Filter by condition (Rent mode only)
+      if (selectedConditions.length > 0 && mode === 'rent') {
+        result = result.filter(p => selectedConditions.includes(p.condition_type));
+      }
+
+      // 4. Filter by color (Join variants table)
+      if (selectedColors.length > 0) {
+        result = result.filter(p => {
+          const productColors = p.variants?.map(v => v.colour_name) || [];
+          return productColors.some(c => selectedColors.includes(c));
+        });
+      }
+
+      // 5. Filter by availability
+      if (isAvailableOnly) {
+        result = result.filter(p => p.is_available && p.stock_quantity > 0);
+      }
+
+      // 6. Filter by search query (FTS simulation)
+      if (searchQuery) {
+        const term = searchQuery.toLowerCase().trim();
+        result = result.filter(p => 
+          p.name.toLowerCase().includes(term) ||
+          p.brand.toLowerCase().includes(term) ||
+          p.category.toLowerCase().includes(term) ||
+          p.description.toLowerCase().includes(term)
+        );
+      }
+
+      // 7. Sorting
+      if (sortBy) {
+        result.sort((a, b) => {
+          const priceA = mode === 'rent' ? parseFloat(a.rent_price_month) : parseFloat(a.buy_price);
+          const priceB = mode === 'rent' ? parseFloat(b.rent_price_month) : parseFloat(b.buy_price);
+
+          switch (sortBy) {
+            case 'price_low_high':
+              return priceA - priceB;
+            case 'price_high_low':
+              return priceB - priceA;
+            case 'newest':
+              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            case 'popular':
+              return b.review_count - a.review_count;
+            case 'rating':
+              return parseFloat(b.rating) - parseFloat(a.rating);
+            default:
+              return 0;
+          }
+        });
+      }
+
+      // 8. Pagination (Limit and Offset)
+      const paginated = result.slice(offset, offset + limit);
+
+      return {
+        success: true,
+        products: paginated,
+        total: result.length
       };
-
-      if (selectedCategories.length > 0) params.category = selectedCategories.join(',');
-      if (priceRange[0] > 0) params.minPrice = priceRange[0];
-      if (priceRange[1] < (mode === 'rent' ? 15000 : 200000)) params.maxPrice = priceRange[1];
-      if (selectedColors.length > 0) params.color = selectedColors.join(',');
-      if (selectedConditions.length > 0 && mode === 'rent') params.condition = selectedConditions.join(',');
-      if (searchQuery) params.search = searchQuery;
-
-      const response = await api.get('/products', { params });
-      return response.data;
     }
   });
 

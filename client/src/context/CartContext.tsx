@@ -1,8 +1,7 @@
-import React, { createContext, useContext } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../api/axios';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { CartItem } from '../types';
 import { useAuth } from './AuthContext';
+import { products } from '../data/products';
 
 interface CartTotals {
   subtotal: number;
@@ -26,81 +25,96 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Fetch cart items using React Query (only if user is logged in)
-  const { data: cartItems = [], isLoading } = useQuery<CartItem[]>({
-    queryKey: ['cart', user?.id],
-    queryFn: async () => {
-      const response = await api.get('/cart');
-      return response.data;
-    },
-    enabled: !!user,
-  });
-
-  // Add to Cart Mutation
-  const addToCartMutation = useMutation({
-    mutationFn: async (payload: { productId: number; variantId: number; quantity: number; mode: 'buy' | 'rent'; rentalDuration?: string }) => {
-      await api.post('/cart', {
-        productId: payload.productId,
-        variantId: payload.variantId,
-        quantity: payload.quantity,
-        mode: payload.mode,
-        rentalDuration: payload.rentalDuration,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cart', user?.id] });
-    },
-  });
-
-  // Update Cart Mutation
-  const updateCartMutation = useMutation({
-    mutationFn: async (payload: { cartId: number; quantity: number; rentalDuration?: string }) => {
-      await api.put(`/cart/${payload.cartId}`, {
-        quantity: payload.quantity,
-        rentalDuration: payload.rentalDuration,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cart', user?.id] });
-    },
-  });
-
-  // Remove Cart Item Mutation
-  const removeCartMutation = useMutation({
-    mutationFn: async (cartId: number) => {
-      await api.delete(`/cart/${cartId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cart', user?.id] });
-    },
-  });
-
-  // Clear Cart Mutation
-  const clearCartMutation = useMutation({
-    mutationFn: async () => {
-      await api.delete('/cart');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cart', user?.id] });
-    },
-  });
+  // Sync cart items when user changes
+  useEffect(() => {
+    setIsLoading(true);
+    const key = `rentease_cart_${user?.id || 'guest'}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try {
+        setCartItems(JSON.parse(saved));
+      } catch (e) {
+        setCartItems([]);
+      }
+    } else {
+      setCartItems([]);
+    }
+    setIsLoading(false);
+  }, [user]);
 
   const addToCart = async (productId: number, variantId: number, quantity: number, mode: 'buy' | 'rent', rentalDuration?: string) => {
-    await addToCartMutation.mutateAsync({ productId, variantId, quantity, mode, rentalDuration });
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+    const variant = prod.variants?.find(v => v.id === variantId);
+    if (!variant) return;
+
+    setCartItems(prev => {
+      const existingIdx = prev.findIndex(item => item.product_id === productId && item.variant_id === variantId && item.mode === mode);
+      let updated;
+      if (existingIdx !== -1) {
+        updated = [...prev];
+        updated[existingIdx].quantity = Math.min(
+          updated[existingIdx].quantity + quantity,
+          variant.stock
+        );
+      } else {
+        const newItem: CartItem = {
+          id: Math.max(...prev.map(i => i.id), 0) + 1,
+          product_id: productId,
+          variant_id: variantId,
+          quantity,
+          mode,
+          rental_duration: rentalDuration || (mode === 'rent' ? '3_months' : null),
+          name: prod.name,
+          brand: prod.brand,
+          category: prod.category,
+          buy_price: prod.buy_price,
+          rent_price_week: prod.rent_price_week,
+          rent_price_month: prod.rent_price_month,
+          colour_name: variant.colour_name,
+          colour_hex: variant.colour_hex,
+          images: variant.images,
+          max_product_stock: prod.stock_quantity,
+          max_variant_stock: variant.stock
+        };
+        updated = [...prev, newItem];
+      }
+      localStorage.setItem(`rentease_cart_${user?.id || 'guest'}`, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const updateCartItem = async (cartId: number, quantity: number, rentalDuration?: string) => {
-    await updateCartMutation.mutateAsync({ cartId, quantity, rentalDuration });
+    setCartItems(prev => {
+      const updated = prev.map(item => {
+        if (item.id === cartId) {
+          return {
+            ...item,
+            quantity: Math.min(quantity, item.max_variant_stock),
+            rental_duration: rentalDuration !== undefined ? rentalDuration : item.rental_duration
+          };
+        }
+        return item;
+      });
+      localStorage.setItem(`rentease_cart_${user?.id || 'guest'}`, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const removeFromCart = async (cartId: number) => {
-    await removeCartMutation.mutateAsync(cartId);
+    setCartItems(prev => {
+      const updated = prev.filter(item => item.id !== cartId);
+      localStorage.setItem(`rentease_cart_${user?.id || 'guest'}`, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const clearCart = async () => {
-    await clearCartMutation.mutateAsync();
+    setCartItems([]);
+    localStorage.removeItem(`rentease_cart_${user?.id || 'guest'}`);
   };
 
   // Compute Cart Totals Reactively
@@ -112,7 +126,6 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       const price = item.mode === 'rent' ? parseFloat(item.rent_price_month) : parseFloat(item.buy_price);
       subtotal += price * item.quantity;
 
-      // Security deposit for rentals: 1 month of rent per item
       if (item.mode === 'rent') {
         deposit += parseFloat(item.rent_price_month) * item.quantity;
       }

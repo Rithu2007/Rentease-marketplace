@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Heart, ShoppingCart, Calendar, Truck, Clock, RefreshCw, Send, Star, Shield, ArrowLeft, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import api from '../api/axios';
+import { products } from '../data/products';
 import { Product, ProductVariant, Review } from '../types';
 import { useMode } from '../context/ModeContext';
 import { useCart } from '../context/CartContext';
@@ -12,6 +12,29 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { ThreeDViewer } from '../three/ThreeDViewer';
 import { DetailSkeleton } from '../components/Skeletons';
+
+const getMockReviews = (productId: number): Review[] => {
+  const localReviews = JSON.parse(localStorage.getItem(`rentease_reviews_${productId}`) || '[]');
+  const defaultReviews: Review[] = [
+    {
+      id: 1000 + productId * 10 + 1,
+      rating: 5,
+      review_text: "Absolutely stunning product! The quality of the materials is premium and it fits perfectly in my space. The delivery team was extremely professional.",
+      created_at: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(),
+      user_name: "Sarah Jenkins",
+      user_avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Sarah"
+    },
+    {
+      id: 1000 + productId * 10 + 2,
+      rating: 4,
+      review_text: "Very comfortable and durable. The visual appeal matches the pictures perfectly. Had a slight delay in delivery, but the support team kept me updated.",
+      created_at: new Date(Date.now() - 12 * 24 * 3600 * 1000).toISOString(),
+      user_name: "Michael Chen",
+      user_avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Michael"
+    }
+  ];
+  return [...localReviews, ...defaultReviews];
+};
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -48,12 +71,34 @@ export default function ProductDetailPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['product', id],
     queryFn: async () => {
-      const response = await api.get(`/products/${id}`);
-      return response.data;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const productId = parseInt(id || '');
+      const prod = products.find(p => p.id === productId);
+      if (!prod) {
+        throw new Error('Product not found.');
+      }
+
+      const productReviews = getMockReviews(productId);
+      const categoryRecommendations = products
+        .filter(p => p.id !== productId && p.category === prod.category)
+        .slice(0, 6)
+        .map(p => ({
+          ...p,
+          thumbnail: p.variants?.[0]?.images?.[0] || p.thumbnail
+        }));
+
+      return {
+        product: prod,
+        variants: prod.variants || [],
+        reviews: productReviews,
+        recommendations: categoryRecommendations.length > 0 
+          ? categoryRecommendations 
+          : products.filter(p => p.id !== productId).slice(0, 6)
+      };
     }
   });
 
-  const product: Product = data?.product;
+  const product = data?.product as Product;
   const variants: ProductVariant[] = data?.variants || [];
   const reviews: Review[] = data?.reviews || [];
   const recommendations: Product[] = data?.recommendations || [];
@@ -68,18 +113,32 @@ export default function ProductDetailPage() {
   // Submit Review Mutation
   const reviewMutation = useMutation({
     mutationFn: async (payload: { rating: number; reviewText: string }) => {
-      const response = await api.post(`/products/${id}/reviews`, payload);
-      return response.data;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      
+      const newReview: Review = {
+        id: Date.now(),
+        rating: payload.rating,
+        review_text: payload.reviewText,
+        created_at: new Date().toISOString(),
+        user_name: user?.name || 'Anonymous User',
+        user_avatar: user?.profile_picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user?.name || 'Anonymous'}`
+      };
+
+      const existingReviews = JSON.parse(localStorage.getItem(`rentease_reviews_${id}`) || '[]');
+      existingReviews.unshift(newReview);
+      localStorage.setItem(`rentease_reviews_${id}`, JSON.stringify(existingReviews));
+
+      return { success: true };
     },
-    onSuccess: (res) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['product', id] });
       setReviewText('');
       setReviewRating(5);
       setReviewError(null);
       showToast('Thank you! Your review has been added.', 'success');
     },
-    onError: (err: any) => {
-      setReviewError(err.response?.data?.message || 'Failed to submit review.');
+    onError: () => {
+      setReviewError('Failed to submit review.');
     }
   });
 

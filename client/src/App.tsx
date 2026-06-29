@@ -23,7 +23,6 @@ const CheckoutPage = React.lazy(() => import('./pages/CheckoutPage'));
 const OrderSuccessPage = React.lazy(() => import('./pages/OrderSuccessPage'));
 const ProfilePage = React.lazy(() => import('./pages/ProfilePage'));
 const WishlistPage = React.lazy(() => import('./pages/WishlistPage'));
-const AuthCallbackPage = React.lazy(() => import('./pages/AuthCallbackPage'));
 
 // Protected Route Wrapper
 const ProtectedRoute: React.FC = () => {
@@ -183,7 +182,6 @@ const AppContent: React.FC = () => {
                 <Route path="/" element={<PageTransition><LandingPage /></PageTransition>} />
                 <Route path="/login" element={<PageTransition><AuthPage mode="login" /></PageTransition>} />
                 <Route path="/register" element={<PageTransition><AuthPage mode="register" /></PageTransition>} />
-                <Route path="/auth/callback" element={<PageTransition><AuthCallbackPage /></PageTransition>} />
 
                 {/* Protected Pages */}
                 <Route element={<ProtectedRoute />}>

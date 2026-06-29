@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { User as UserIcon, MapPin, Receipt, RotateCcw, ShieldAlert, HelpCircle, Eye, Check, Edit, Trash2, X, Plus, Calendar, Bell } from 'lucide-react';
-import api from '../api/axios';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Address, Order, ActiveRental } from '../types';
@@ -185,8 +185,10 @@ export default function ProfilePage() {
   const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
     queryKey: ['orders', user?.id],
     queryFn: async () => {
-      const response = await api.get('/orders');
-      return response.data;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const key = `rentease_orders_${user?.id || 'guest'}`;
+      const list = localStorage.getItem(key);
+      return list ? JSON.parse(list) : [];
     },
     enabled: !!user && (currentTab === 'dashboard' || currentTab === 'orders')
   });
@@ -195,8 +197,10 @@ export default function ProfilePage() {
   const { data: rentals = [], isLoading: rentalsLoading } = useQuery<ActiveRental[]>({
     queryKey: ['rentals', user?.id],
     queryFn: async () => {
-      const response = await api.get('/orders/rentals');
-      return response.data;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const key = `rentease_active_rentals_${user?.id || 'guest'}`;
+      const list = localStorage.getItem(key);
+      return list ? JSON.parse(list) : [];
     },
     enabled: !!user && (currentTab === 'dashboard' || currentTab === 'rentals')
   });
@@ -205,8 +209,30 @@ export default function ProfilePage() {
   const { data: addresses = [], isLoading: addressesLoading } = useQuery<Address[]>({
     queryKey: ['addresses', user?.id],
     queryFn: async () => {
-      const response = await api.get('/users/addresses');
-      return response.data;
+      const key = `rentease_addresses_${user?.id || 'guest'}`;
+      let list = localStorage.getItem(key);
+      if (!list) {
+        const seeded = [
+          {
+            id: 1,
+            user_id: user?.id || 2,
+            label: 'Home',
+            full_name: 'John Doe',
+            phone: '9999988888',
+            flat: 'Flat 304, Block B',
+            street: '12th Main Road',
+            area: 'Indiranagar',
+            city: 'Bangalore',
+            state: 'Karnataka',
+            pincode: '560038',
+            landmark: 'Opposite Metro Station',
+            is_default: true
+          }
+        ];
+        localStorage.setItem(key, JSON.stringify(seeded));
+        return seeded;
+      }
+      return JSON.parse(list);
     },
     enabled: !!user && currentTab === 'profile'
   });
@@ -214,17 +240,65 @@ export default function ProfilePage() {
   // Address Save/Edit Mutation
   const addressSaveMutation = useMutation({
     mutationFn: async (payload: any) => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const key = `rentease_addresses_${user?.id || 'guest'}`;
+      const current = JSON.parse(localStorage.getItem(key) || '[]');
+      
       if (editingAddress) {
-        return (await api.put(`/users/addresses/${editingAddress.id}`, payload)).data;
+        const index = current.findIndex((a: any) => a.id === editingAddress.id);
+        if (index !== -1) {
+          const updatedAddr = {
+            ...current[index],
+            label: payload.label || 'Home',
+            full_name: payload.fullName,
+            phone: payload.phone,
+            flat: payload.flat,
+            street: payload.street,
+            area: payload.area,
+            city: payload.city,
+            state: payload.state,
+            pincode: payload.pincode,
+            landmark: payload.landmark || null,
+            is_default: payload.isDefault || false
+          };
+          
+          if (updatedAddr.is_default) {
+            current.forEach((a: any) => {
+              if (a.id !== editingAddress.id) a.is_default = false;
+            });
+          }
+          current[index] = updatedAddr;
+        }
       } else {
-        return (await api.post('/users/addresses', payload)).data;
+        const newAddr = {
+          id: Math.max(...current.map((a: any) => a.id), 0) + 1,
+          user_id: user?.id || 2,
+          label: payload.label || 'Home',
+          full_name: payload.fullName,
+          phone: payload.phone,
+          flat: payload.flat,
+          street: payload.street,
+          area: payload.area,
+          city: payload.city,
+          state: payload.state,
+          pincode: payload.pincode,
+          landmark: payload.landmark || null,
+          is_default: payload.isDefault || false
+        };
+
+        if (newAddr.is_default) {
+          current.forEach((a: any) => a.is_default = false);
+        }
+        current.push(newAddr);
       }
+
+      localStorage.setItem(key, JSON.stringify(current));
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['addresses', user?.id] });
       setAddressFormOpen(false);
       setEditingAddress(null);
-      // reset
       setAddrName('');
       setAddrPhone('');
       setAddrFlat('');
@@ -240,7 +314,11 @@ export default function ProfilePage() {
   // Address Delete Mutation
   const addressDeleteMutation = useMutation({
     mutationFn: async (addrId: number) => {
-      await api.delete(`/users/addresses/${addrId}`);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const key = `rentease_addresses_${user?.id || 'guest'}`;
+      const current = JSON.parse(localStorage.getItem(key) || '[]');
+      const filtered = current.filter((a: any) => a.id !== addrId);
+      localStorage.setItem(key, JSON.stringify(filtered));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['addresses', user?.id] });
@@ -335,8 +413,14 @@ export default function ProfilePage() {
   // Fetch full details of order for details modal
   const handleViewOrderDetail = async (orderId: number) => {
     try {
-      const response = await api.get(`/orders/${orderId}`);
-      setSelectedOrderDetail(response.data);
+      const detailsStr = localStorage.getItem(`rentease_order_details_${orderId}`);
+      if (detailsStr) {
+        const details = JSON.parse(detailsStr);
+        setSelectedOrderDetail({
+          order: details,
+          items: details.items || []
+        });
+      }
     } catch (e) {
       console.error(e);
     }

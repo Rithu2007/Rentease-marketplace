@@ -1,8 +1,7 @@
-import React, { createContext, useContext } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../api/axios';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { WishlistItem } from '../types';
 import { useAuth } from './AuthContext';
+import { products } from '../data/products';
 
 interface WishlistContextType {
   wishlist: WishlistItem[];
@@ -16,51 +15,71 @@ const WishlistContext = createContext<WishlistContextType | undefined>(undefined
 
 export const WishlistProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Fetch wishlist items (only if user is logged in)
-  const { data: wishlist = [], isLoading } = useQuery<WishlistItem[]>({
-    queryKey: ['wishlist', user?.id],
-    queryFn: async () => {
-      const response = await api.get('/wishlist');
-      return response.data;
-    },
-    enabled: !!user,
-  });
-
-  // Toggle Wishlist Mutation
-  const toggleMutation = useMutation({
-    mutationFn: async (productId: number) => {
-      const exists = wishlist.some((item) => item.product_id === productId);
-      if (exists) {
-        await api.delete(`/wishlist/${productId}`);
-      } else {
-        await api.post('/wishlist', { productId });
+  // Sync wishlist when user changes
+  useEffect(() => {
+    setIsLoading(true);
+    const key = `rentease_wishlist_${user?.id || 'guest'}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try {
+        setWishlist(JSON.parse(saved));
+      } catch (e) {
+        setWishlist([]);
       }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['wishlist', user?.id] });
-    },
-  });
-
-  // Toggle Price Drop Alerts Mutation
-  const toggleAlertsMutation = useMutation({
-    mutationFn: async (payload: { wishlistId: number; alertsFlag: boolean }) => {
-      await api.put(`/wishlist/${payload.wishlistId}`, {
-        wishlistAlerts: payload.alertsFlag,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['wishlist', user?.id] });
-    },
-  });
+    } else {
+      setWishlist([]);
+    }
+    setIsLoading(false);
+  }, [user]);
 
   const toggleWishlist = async (productId: number) => {
-    await toggleMutation.mutateAsync(productId);
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+
+    setWishlist(prev => {
+      const exists = prev.some(item => item.product_id === productId);
+      let updated;
+      if (exists) {
+        updated = prev.filter(item => item.product_id !== productId);
+      } else {
+        const newItem: WishlistItem = {
+          id: Math.max(...prev.map(i => i.id), 0) + 1,
+          product_id: productId,
+          wishlist_alerts: false,
+          added_at: new Date().toISOString(),
+          name: prod.name,
+          brand: prod.brand,
+          category: prod.category,
+          buy_price: prod.buy_price,
+          rent_price_month: prod.rent_price_month,
+          rating: prod.rating,
+          review_count: prod.review_count,
+          thumbnail: prod.thumbnail || (prod.variants?.[0]?.images?.[0] as string) || ''
+        };
+        updated = [...prev, newItem];
+      }
+      localStorage.setItem(`rentease_wishlist_${user?.id || 'guest'}`, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const toggleAlerts = async (wishlistId: number, alertsFlag: boolean) => {
-    await toggleAlertsMutation.mutateAsync({ wishlistId, alertsFlag });
+    setWishlist(prev => {
+      const updated = prev.map(item => {
+        if (item.id === wishlistId) {
+          return {
+            ...item,
+            wishlist_alerts: alertsFlag
+          };
+        }
+        return item;
+      });
+      localStorage.setItem(`rentease_wishlist_${user?.id || 'guest'}`, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const isWishlisted = (productId: number): boolean => {

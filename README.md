@@ -1,145 +1,70 @@
-# RentEase - Luxurious Furniture & Appliance Rentals
+# RentEase - Luxurious Standalone Furniture & Appliance Rentals
 
-RentEase is a production-grade, dark-luxury Furniture and Appliance Rental + Purchase web application tailored for the Indian market. It features a React 18 + TypeScript + Vite frontend powered by GSAP, Framer Motion, and Three.js for stunning 3D animations, and a Node.js + Express backend running over a PostgreSQL database.
+RentEase is a production-grade, dark-luxury Furniture and Appliance Rental + Purchase web application tailored for the Indian market. 
+
+This application has been fully refactored into a **completely standalone frontend-only application** that runs entirely client-side, powered by a local `localStorage` database, and is fully ready to deploy on **Netlify** with zero configuration, external databases, or backend dependencies.
+
+The backend Node/Express/PostgreSQL codebase remains preserved under the `server/` directory solely to demonstrate full-stack architecture for internship reviews and portfolio reviews.
 
 ---
 
 ## Technical Stack Overview
 
-### Frontend
 - **Framework**: React 18 + TypeScript + Vite
-- **Styling**: Tailwind CSS (luxury dark palette: `#0A0A0F` background, `#D4A853` gold accent, `#00D4AA` teal accent)
-- **3D Graphics & Animations**: Three.js + GSAP + Framer Motion (floating hero models, starfield particle system, and 360-degree color-lerping product inspector)
-- **Navigation & Data Fetching**: React Router v6, Axios, and React Query
-
-### Backend
-- **Framework**: Node.js + Express.js
-- **Database**: PostgreSQL (using `pg` pool with support for `DATABASE_URL` strings)
-- **Security & Session**: JWT session tokens stored in secure `httpOnly` cookies, bcryptjs password hashing, Passport.js Google OAuth 2.0
-- **Service Integrations**: Razorpay Node SDK (payment order generation and signature verification), Nodemailer (HTML invoices)
+- **Data Layer**: Static local catalog ([products.ts](file:///c:/Users/Ritish/OneDrive/Desktop/RentEase/client/src/data/products.ts)) containing 100 premium products, variants, dimensions, and specifications.
+- **Client-Side Storage**: Synchronized `localStorage` database for all user profiles, shopping carts, product reviews, wishlists, and order histories.
+- **3D Graphics & Animations**: Three.js + GSAP + Framer Motion (floating hero models, starfield particle system, and 360-degree color-lerping product inspector).
+- **Navigation & Querying**: React Router v6, local state managers, and React Query (mocked for async transitions and skeletons).
+- **Hosting Compatibility**: Direct static build for Netlify/Vercel (pre-configured with SPA route redirects via [public/_redirects](file:///c:/Users/Ritish/OneDrive/Desktop/RentEase/client/public/_redirects)).
 
 ---
 
 ## Getting Started & Local Installation
 
 ### Prerequisites
-1. **Node.js**: Install Node.js (v18.x or higher) from [nodejs.org](https://nodejs.org/).
-2. **PostgreSQL**: Install PostgreSQL (v12.x or higher) from [postgresql.org](https://www.postgresql.org/).
+- **Node.js**: Install Node.js (v18.x or higher) from [nodejs.org](https://nodejs.org/).
+
+### Start the Application (Development Mode)
+You do not need to set up databases, seeds, or environment variables. Simply start the Vite development server:
+
+1. In your terminal, run from the root workspace directory:
+   ```bash
+   npm run dev --prefix client
+   ```
+   *(Or navigate into the `client/` folder and run `npm run dev`)*
+2. Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-### Step 1: Database Setup
+## Standalone Frontend Architecture
 
-1. Open your terminal or `psql` shell as a superuser.
-2. Create the `rentease` database:
-   ```sql
-   CREATE DATABASE rentease;
-   ```
-3. Run the schema script to create all 11 required tables, keys, and GIN indexes:
-   ```bash
-   psql -U postgres -d rentease -f server/db/schema.sql
-   ```
-4. Load the seed dataset of exactly 100 products (12 categories) with color variants and Unsplash images:
-   ```bash
-   psql -U postgres -d rentease -f server/db/seed.sql
-   ```
+All business logic, database queries, and session management are handled directly in the browser:
 
----
+### 1. Local Authentication & OTP
+- User credentials, profile pictures, and onboarding details are stored under `rentease_users` and `rentease_current_user`.
+- Forgot password requests generate simulated verification OTPs in the user notification container.
 
-### Step 2: Environment Configuration
+### 2. Shopping Cart & Wishlist Contexts
+- Shopping cart items and purchase/rental modes are synced in `localStorage` under `rentease_cart_${userId}`.
+- Wishlist items and custom price drop alerts are synced in `localStorage` under `rentease_wishlist_${userId}`.
 
-Create a `.env` file in the root workspace folder (`rentease/.env`) using the following template:
+### 3. Catalog Filtering & Search Autocomplete
+- Debounced autocomplete search in the navbar performs full text-matching locally against the static products list.
+- The Products Page executes client-side sorting, price checking, color filter checks, category checking, availability checks, and pagination (offset + limit) of the 100 products.
 
-```env
-# Database Configuration
-DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/rentease
-PGHOST=localhost
-PGPORT=5432
-PGUSER=postgres
-PGPASSWORD=yourpassword
-PGDATABASE=rentease
+### 4. Interactive 3D Viewer & Reviews
+- Switch between 2D high-res galleries and 360-degree Three.js interactive model inspectors.
+- Submit ratings and product reviews, which are stored in `localStorage` under `rentease_reviews_${productId}` for instant rendering.
 
-# Google OAuth (Leave empty to enable mock simulation bypass)
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
-
-# JWT Config
-JWT_SECRET=rentease_super_secret_jwt_key_2026_luxury_dark_theme
-JWT_EXPIRES_IN=7d
-
-# Razorpay Keys (Leave empty to enable mock gateway simulation bypass)
-RAZORPAY_KEY_ID=
-RAZORPAY_KEY_SECRET=
-
-# Email SMTP (Leave empty to save invoices in server/scratch/ instead of crashing)
-SMTP_USER=youremail@gmail.com
-SMTP_PASS=your_app_password
-SMTP_FROM="RentEase Support" <youremail@gmail.com>
-
-# App Configs
-CLIENT_URL=http://localhost:5173
-SERVER_PORT=5000
-NODE_ENV=development
-```
+### 5. Checkout Simulator & Orders Dashboard
+- Address book is managed in `localStorage` under `rentease_addresses_${userId}`.
+- Click "Pay" to open the interactive payment gateway simulator (bypassing Razorpay server queries).
+- Completing a simulated payment clears the cart, generates a detailed invoice receipt, stores the order in `rentease_orders_${userId}` (and item lists in `rentease_order_details_${orderId}`), and populates active rental contracts in `rentease_active_rentals_${userId}`.
+- Review past purchases, download detailed invoices, and check remaining rental duration days directly on your Dashboard.
 
 ---
 
-### Step 3: Server Dependencies & Execution
-
-1. Open a terminal and navigate to the `server/` directory:
-   ```bash
-   cd server
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the Express server in development mode:
-   ```bash
-   npm run dev
-   ```
-   *The server will boot on port `5000` and output the database connection validation check.*
-
----
-
-### Step 4: Client Dependencies & Execution
-
-1. Open a separate terminal and navigate to the `client/` directory:
-   ```bash
-   cd client
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the Vite development server:
-   ```bash
-   npm run dev
-   ```
-   *The client web portal will launch on [http://localhost:5173](http://localhost:5173).*
-
----
-
-## Key Features & Testing Guide
-
-### 1. Zero-Config Sandbox Mode (Fallbacks)
-If you do not configure Google Console or Razorpay credentials in your `.env`:
-- **Simulated Google Login**: Clicking "Sign in with Google" displays an interactive overlay. Select or enter any email/name to log in or register instantly.
-- **Simulated Payment Gateway**: On checkout, a custom mock Razorpay popup matches the native Razorpay design. Authorizing the payment triggers the backend signature verification, creating the PostgreSQL order, clearing your cart, and generating an invoice.
-- **Invoice Console Logging**: Nodemailer HTML invoices are saved under `rentease/scratch/invoice_[order_id].html` for quick local inspection.
-
-### 2. Autocomplete Search Bar
-- Expands with glowing borders. Debounced at 250ms.
-- Searches via PostgreSQL GIN Index (`tsvector`).
-- Highlights matching letters in gold, returning rich thumbnails, prices, and category badges.
-- Displays up to 5 recent queries from `localStorage`. Supports full keyboard navigation.
-
-### 3. 360° Interactive Product Viewer
-- In the product details page, click the "360° View" tab.
-- Mouse dragging rotates the custom-made Three.js models.
-- Swapping color swatches interpolates (lerps) the model color over 20 frames.
-
-### 4. Product Comparisons
-- Check "Compare" on up to 3 cards.
-- Click the floating toolbar's "Compare" button to see a side-by-side spec sheet comparison (prices, ratings, warranties, dimensions).
+## Portfolio Full-Stack Assets (Dormant)
+The Express backend files reside under the [server/](file:///c:/Users/Ritish/OneDrive/Desktop/RentEase/server) directory. This includes:
+- PostgreSQL GIN indexes, schema definitions ([schema.sql](file:///c:/Users/Ritish/OneDrive/Desktop/RentEase/server/db/schema.sql)), and data seeds ([seed.sql](file:///c:/Users/Ritish/OneDrive/Desktop/RentEase/server/db/seed.sql)).
+- Nodemailer HTML templates, JWT session cookies, and Razorpay server-side signature validators.

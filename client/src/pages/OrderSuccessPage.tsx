@@ -3,7 +3,6 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import confetti from 'canvas-confetti';
 import { CheckCircle2, Download, ArrowRight, Truck, Mail, FileText } from 'lucide-react';
-import api from '../api/axios';
 import { OrderDetail } from '../types';
 import html2pdf from 'html2pdf.js';
 import { useAuth } from '../context/AuthContext';
@@ -20,8 +19,17 @@ export default function OrderSuccessPage() {
   const { data: orderDetailsData, isLoading, error } = useQuery<{ success: boolean; order: any; items: any[] }>({
     queryKey: ['order-success', orderId],
     queryFn: async () => {
-      const response = await api.get(`/orders/${orderId}`);
-      return response.data;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const detailsStr = localStorage.getItem(`rentease_order_details_${orderId}`);
+      if (!detailsStr) {
+        throw new Error('Order not found.');
+      }
+      const details = JSON.parse(detailsStr);
+      return {
+        success: true,
+        order: details,
+        items: details.items || []
+      };
     },
     enabled: !!orderId
   });
